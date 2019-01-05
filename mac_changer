@@ -1,0 +1,88 @@
+#!/bin/bash
+reset
+function usage {
+echo ""
+echo ""
+echo -e "\e[95m [+] Program name: Mac Address Changer"
+echo -e "\e[95m [+] Version: 1.0"
+echo -e "\e[95m [+] Coded by: ksrvco"
+echo -e "\e[95m [+] Tested on: Ubuntu-x64 and Kali-x64 and Mint-x64"
+echo -e "\e[95m [+] Contact Me: h.attacker98[at]gmail.com"
+echo ""
+echo " Options of this tool : "
+echo ""
+ echo -e "    -i       Choose interface name"
+ echo -e "    -t       Waiting time after an mac address maked and continue for making another\n"
+echo ""
+echo " For Example : "
+echo ""
+echo " bash Mac_Changer.sh -i wlan0 -t 1"
+echo ""
+}
+
+function readarg {
+ while getopts i:t:h option
+    do
+         case "${option}"
+            in
+                 i) interface_name=${OPTARG};;
+                 t) time=${OPTARG};;
+                 h) usage
+                    exit;;
+            esac
+    done
+ clear
+}
+
+function checkarg {
+ [ "$UID" != 0 ] && echo -e "\e[95m \n\n Please run this script with root privilage.\n\n" && exit 1
+ [ -z "$interface_name" ] && usage && exit 1 
+ ifconfig "$interface_name" &>/dev/null
+ [ "$?" != 0 ] && echo " Interface '$interface_name' does not exist." && exit 1
+ [ -z "$time" ] && usage && exit 1
+
+ type -P iwconfig &>/dev/null
+ [ "$?" != 0 ] && echo " Utility 'iwconfig' not found." && exit 1
+}
+
+readarg $@
+checkarg
+
+new_mac=00
+count_mac=0
+wifi="$(iwconfig $interface_name 2> /dev/null | grep ESSID | awk '/ESSID/ {print $2}')"
+defgw="$(/sbin/route -n | grep "$interface_name" | awk '/UG/ {print $2}')"
+echo -e "\n\n Found IP address of default gateway: $defgw \n\n"
+
+while [ true ]; do
+ while [ "$i" != 5 ]; do
+  dec_num=$(shuf -i 0-255 -n1)
+  hex_digits=$(printf "%x\n" $dec_num)
+  hex_digits_numb=${#hex_digits}
+  if [ "$hex_digits_numb" == 1 ]; then
+   hex_digits=0$hex_digits_numb
+  fi
+  new_mac+=:$hex_digits
+  i=$(( $i + 1))
+ done
+
+ old_mac="$(/sbin/ifconfig $interface_name | awk '/ether/ {print $2}')"
+ 
+ if [ "$wifi" == "IEEE" ]; then
+    ifconfig "$interface_name" down &>/dev/null
+    ifconfig "$interface_name" hw ether "$new_mac" &>/dev/null
+    [ "$?" != 0 ] && echo " Can not set mac address '$new_mac'" && exit 1
+    ifconfig "$interface_name" up &>/dev/null
+    /sbin/route add default gw "$defgw" &>/dev/null
+  else
+    /sbin/ifconfig "$interface_name" hw ether "$new_mac"
+    [ "$?" != 0 ] && echo " Can not set mac address '$new_mac'" && exit 1
+ fi
+
+ count_mac=$(($count_mac +1));
+ echo -e " MAC address: $old_mac was changed to: $new_mac number of changed MAC addresses is: $count_mac"
+ /bin/sleep "$time";
+ i=0
+ new_mac=00
+done
+# Coded by ksrvco
